@@ -1,0 +1,9 @@
+{
+  "name": "boost",
+  "version": "0.0.1",
+  "description": "",
+  "main": "src/index.js",
+  "author": "engine262 Contributors",
+  "license": "MIT",
+  "dependencies": {}
+}
