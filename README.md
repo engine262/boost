@@ -9,3 +9,16 @@ boost targets:
 - JS function [[Call]] and [[Construct]] behavior.
 - JS top-level Script and Module evaluation.
 - RegExp execution
+
+### Usage
+
+```js
+const engine262 = require('@engine262/engine262');
+const boost = require('@engine262/boost');
+
+const agent = new engine262.Agent({
+  boost: boost(engine262),
+});
+
+// ...
+```
