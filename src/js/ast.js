@@ -1,97 +1,110 @@
 'use strict';
 
-// TODO: Investigate if there is a fast way to do this without mutating
-// the original AST.
-class ASTConstantFolder {
-  replace(node, type, props) {
-    return {
-      type,
-      location: node.location,
-      ...props,
-    };
-  }
+const NODES = {
+  IdentifierReference: [],
+  BindingIdentifier: [],
+  LabelIdentifier: [],
+  Identifier: [],
+  NullLiteral: [],
+  BooleanLiteral: [],
+  NumericLiteral: [],
+  StringLiteral: [],
+  ArrayLiteral: ['ElementList'],
+  ObjectLiteral: ['PropertyDefinitionList'],
+  FunctionExpression: ['FormalParameters', 'FunctionBody'],
+  ClassExpression: ['ClassTail'],
+  ClassTail: ['ClassHeritage', 'ClassBody'],
+  ClassBody: ['ClassElementList'],
+  ClassElement: ['MethodDefinition'],
+  GeneratorExpression: ['FormalParameters', 'GeneratorBody'],
+  AsyncFunctionExpression: ['FormalParameters', 'AsyncFunctionBody'],
+  AsyncGeneratorExpression: ['FormalParameters', 'AsyncGeneratorBody'],
+  RegularExpressionLiteral: [],
+  TemplateLiteral: ['ExpressionList'],
+  MemberExpression: ['MemberExpression', 'Expression'],
+  SuperProperty: [],
+  MetaProperty: [],
+  NewExpression: ['MemberExpression', 'Arguments'],
+  CallExpression: ['CallExpression', 'Arguments'],
+  SuperCall: ['Arguments'],
 
-  fold(node) {
-    // TODO: unroll this?
-    return this[`fold${node.type}`](node);
-  }
+  // ExponentiationExpression
+  // AdditiveExpression
+  // MultiplicativeExpression
+  // AdditiveExpression
+  // ShiftExpression
+  // RelationalExpression
+  // EqualityExpression
+  // BitwiseANDExpression
+  // BitwiseXORExpression
+  // BitwiseORExpression
+  // LogicalANDExpression
+  // LogicalORExpression
+  // CoalesceExpression
+  // ConditionalExpression
+  // AssignmentExpression
 
-  foldScript(Script) {
-    return this.fold(Script.ScriptBody);
-  }
+  BlockStatement: ['Block'],
+  Block: ['StatementList'],
+  VariableStatement: [],
+  EmptyStatement: [],
+  // ExpressionStatement
+  // IfStatement
 
-  foldScriptBody(ScriptBody) {
-    ScriptBody.StatementList = ScriptBody.StatementList.map((S) => this.fold(S));
-    return ScriptBody;
-  }
+  Script: ['ScriptBody'],
+  ScriptBody: ['StatementList'],
+};
 
-  foldBlock(Block) {
-    Block.StatementList = Block.StatementList.map((S) => this.fold(S));
-    if (Block.StatementList.length === 0) {
-      return this.replace(Block, 'NullLiteral', {});
-    }
-    if (Block.StatementList.length === 1) {
-      return Block.StatementList[0];
-    }
-    return Block;
-  }
-
-  foldIfStatement(IfStatement) {
-    IfStatement.Expression = this.fold(IfStatement.Expression);
-
-    // TODO: support all literal types
-    if (IfStatement.Expression.type === 'BooleanLiteral') {
-      if (IfStatement.Expression.value) {
-        return this.fold(IfStatement.Statement_a);
+function fold(node) {
+  const clone = { ...node };
+  switch (node.type) {
+    case 'AdditiveExpression': {
+      const left = fold(node.AdditiveExpression);
+      const right = fold(node.MultiplicativeExpression);
+      // TODO: support all literal types
+      if (left.type === 'NumericLiteral' && right.type === 'NumericLiteral') {
+        clone.type = 'NumericLiteral';
+        clone.value = node.operator === '+'
+          ? left.value + right.value
+          : left.value - right.value;
+        return clone;
       }
-      return IfStatement.Statement_b
-        ? this.fold(IfStatement.Statement_b)
-        : this.replace(IfStatement, 'NullLiteral', {});
+      clone.AdditiveExpression = left;
+      clone.MultiplicativeExpression = right;
+      return clone;
     }
-
-    IfStatement.Statement_a = this.fold(IfStatement.Statement_a);
-    IfStatement.Statement_b = this.fold(IfStatement.Statement_b);
-
-    return IfStatement;
-  }
-
-  foldExpressionStatement(ExpressionStatement) {
-    return this.fold(ExpressionStatement.Expression);
-  }
-
-  foldAdditiveExpression(E) {
-    E.AdditiveExpression = this.fold(E.AdditiveExpression);
-    E.MultiplicativeExpression = this.fold(E.MultiplicativeExpression);
-
-    // TODO: support all literal types
-    if (E.AdditiveExpression.type === 'NumericLiteral'
-        && E.MultiplicativeExpression.type === 'NumericLiteral') {
-      return this.replace(E, 'NumericLiteral', {
-        value: E.operator === '+'
-          ? E.AdditiveExpression.value + E.MultiplicativeExpression.value
-          : E.AdditiveExpression.value - E.MultiplicativeExpression.value,
+    case 'ExpressionStatement':
+      return fold(node.Expression);
+    case 'IfStatement':
+      clone.Expression = fold(node.Expression);
+      // TODO: support all literal types
+      if (clone.Expression.type === 'BooleanLiteral') {
+        if (clone.Expression.value) {
+          return fold(node.Statement_a);
+        }
+        if (node.Statement_b) {
+          return fold(node.Statement_b);
+        }
+        clone.type = 'NullLiteral';
+        return clone;
+      }
+      clone.Statement_a = fold(node.Statement_a);
+      clone.Statement_b = fold(node.Statement_b);
+      return clone;
+    default: {
+      if (!NODES[node.type]) {
+        throw new RangeError(node.type);
+      }
+      NODES[node.type].forEach((field) => {
+        if (Array.isArray(node[field])) {
+          clone[field] = node[field].map((f) => fold(f));
+        } else {
+          clone[field] = fold(node[field]);
+        }
       });
+      return clone;
     }
-
-    return E;
   }
-
-  foldBooleanLiteral(BooleanLiteral) {
-    return BooleanLiteral;
-  }
-
-  foldNumericLiteral(NumericLiteral) {
-    return NumericLiteral;
-  }
-
-  foldStringLiteral(StringLiteral) {
-    return StringLiteral;
-  }
-}
-
-function fold(ast) {
-  const cf = new ASTConstantFolder();
-  return cf.fold(ast);
 }
 
 module.exports = { fold };
