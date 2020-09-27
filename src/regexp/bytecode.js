@@ -199,17 +199,17 @@ class BytecodeGenerator {
     });
   }
 
-  setRegisterToCp(register) {
+  markMatchStart(index) {
     this.code.push({
-      op: Op.SET_REGISTER_TO_CP,
-      register,
+      op: Op.MARK_MATCH_START,
+      index,
     });
   }
 
-  clearRegister(register) {
+  markMatchEnd(index) {
     this.code.push({
-      op: Op.CLEAR_REGISTER,
-      register,
+      op: Op.MARK_MATCH_END,
+      index,
     });
   }
 
@@ -220,9 +220,9 @@ class BytecodeGenerator {
   }
 
   visitPattern(node) {
-    this.setRegisterToCp(0);
+    this.markMatchStart(0);
     this.visit(node.Disjunction);
-    this.setRegisterToCp(1);
+    this.markMatchEnd(0);
     this.accept();
   }
 
@@ -257,12 +257,8 @@ class BytecodeGenerator {
 
   visitTerm(node) {
     if (node.Quantifier) {
-      const index = node.capturingParenthesesBefore + 1;
-      const startRegister = index * 2;
-      const endRegister = (index * 2) + 1;
       const emit = () => {
-        this.clearRegister(startRegister);
-        this.clearRegister(endRegister);
+        // clear group match?
         this.visit(node.Atom);
       };
 
@@ -376,11 +372,9 @@ class BytecodeGenerator {
         break;
       case node.capturing: {
         const index = node.capturingParenthesesBefore + 1;
-        const startRegister = index * 2;
-        const endRegister = (index * 2) + 1;
-        this.setRegisterToCp(startRegister);
+        this.markMatchStart(index);
         this.visit(node.Disjunction);
-        this.setRegisterToCp(endRegister);
+        this.markMatchEnd(index);
         break;
       }
       case !!node.Disjunction:
@@ -504,27 +498,7 @@ class BytecodeGenerator {
       v = this.engine262.UnicodeMatchPropertyValue(p, vs);
     }
     const path = v ? `${p}/${v}` : `Binary_Property/${p}`;
-    const cps = require(`unicode-13.0.0/${path}/code-points.js`);
-    const ranges = [];
-    let from = 0;
-    let to = 0;
-    cps.forEach((cp, i) => {
-      if (i === 0) {
-        from = cp;
-        to = cp;
-      } else {
-        // eslint-disable-next-line no-lonely-if
-        if (to + 1 === cp) {
-          to += 1;
-        } else {
-          ranges.push([from, to]);
-          from = cp;
-          to = cp;
-        }
-      }
-    });
-    ranges.push([from, to]);
-    return ranges;
+    return this.engine262.UnicodeSets[path];
   }
 }
 

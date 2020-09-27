@@ -27,21 +27,19 @@ class RegExpEvaluator {
         return 'failure';
       }
 
-      const registers = e.bestMatchRegisters;
-
       const groups = Array.from({ length: ast.capturingGroups.length + 1 }, (_, i) => {
         if (i === 0) {
           return this.engine262.Value.undefined;
         }
-        const startIndex = registers[i * 2];
-        const endIndex = registers[(i * 2) + 1];
+        const startIndex = e.bestMatches[i * 2];
+        const endIndex = e.bestMatches[(i * 2) + 1];
         if (startIndex === -1 || endIndex === -1) {
           return this.engine262.Value.undefined;
         }
         return input.slice(startIndex, endIndex);
       });
 
-      return new this.engine262.RegExpState(registers[1], groups);
+      return new this.engine262.RegExpState(e.bestMatches[1], groups);
     };
   }
 }

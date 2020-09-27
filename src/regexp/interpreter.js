@@ -5,15 +5,15 @@ const Op = {
   FORK: 1,
   CONSUME_RANGE: 2,
   ACCEPT: 3,
-  SET_REGISTER_TO_CP: 4,
-  CLEAR_REGISTER: 5,
-  ASSERTION: 6,
+  ASSERTION: 4,
+  MARK_MATCH_START: 5,
+  MARK_MATCH_END: 6,
 };
 
 class Thread {
-  constructor(pc, registers) {
+  constructor(pc, matches) {
     this.pc = pc;
-    this.registers = registers;
+    this.matches = matches;
   }
 }
 
@@ -24,7 +24,7 @@ class Interpreter {
     this.code = code;
     this.activeThreads = [];
     this.blockedThreads = [];
-    this.bestMatchRegisters = null;
+    this.bestMatches = null;
     this.pcLastInputIndex = Array.from({ length: code.length }, () => -1);
   }
 
@@ -52,7 +52,7 @@ class Interpreter {
       const instr = this.code[thread.pc];
       switch (instr.op) {
         case Op.FORK: {
-          const t = new Thread(instr.pc, thread.registers.slice());
+          const t = new Thread(instr.pc, thread.matches.slice());
           this.activeThreads.push(t);
           thread.pc += 1;
           break;
@@ -65,16 +65,8 @@ class Interpreter {
           return;
         case Op.ACCEPT:
           this.activeThreads = [];
-          this.bestMatchRegisters = thread.registers;
+          this.bestMatches = thread.matches;
           return;
-        case Op.SET_REGISTER_TO_CP:
-          thread.pc += 1;
-          thread.registers[instr.register] = this.inputIndex;
-          break;
-        case Op.CLEAR_REGISTER:
-          thread.pc += 1;
-          thread.registers[instr.register] = -1;
-          break;
         case Op.ASSERTION:
           switch (instr.type) {
             case '^':
@@ -92,6 +84,14 @@ class Interpreter {
             default:
               throw new RangeError(instr.type);
           }
+          thread.pc += 1;
+          break;
+        case Op.MARK_MATCH_START:
+          thread.matches[instr.index * 2] = this.inputIndex;
+          thread.pc += 1;
+          break;
+        case Op.MARK_MATCH_END:
+          thread.matches[(instr.index * 2) + 1] = this.inputIndex;
           thread.pc += 1;
           break;
         default:
@@ -115,7 +115,7 @@ class Interpreter {
   }
 
   foundMatch() {
-    return this.bestMatchRegisters !== null;
+    return this.bestMatches !== null;
   }
 
   findNextMatch() {
@@ -140,8 +140,7 @@ class Interpreter {
       }
       matchNum += 1;
 
-      const matchBegin = this.bestMatchRegisters[0];
-      const matchEnd = this.bestMatchRegisters[1];
+      const [matchBegin, matchEnd] = this.bestMatches;
       const matchLength = matchEnd - matchBegin;
       if (matchLength !== 0) {
         this.inputIndex = matchEnd;
