@@ -8,6 +8,7 @@ const Op = {};
   'LOAD_STRING',
 
   'RETURN',
+  'UNREACHABLE',
 ].forEach((n, i) => {
   Op[n] = i;
 });
@@ -42,6 +43,10 @@ class BytecodeGenerator {
 
   return() {
     this.write(Op.RETURN);
+  }
+
+  unreachable() {
+    this.write(Op.UNREACHABLE);
   }
 
   // VISITORS
@@ -82,18 +87,27 @@ class JSEvaluator {
 
     this.pc = -1;
     this.acc = this.engine262.Value.undefined;
+    this.registers = [];
 
     this.handlers = [
       this.opLoadDouble,
       this.opLoadString,
       this.opReturn,
+      this.opUnreachable,
     ];
+
+    const build = (f) => {
+      f(this.bytecode);
+      this.bytecode.unreachable();
+    };
+
+    this.kScriptEntry = build((b) => {
+    });
   }
 
   evaluateScript(scriptRecord) {
-    const pc = this.bytecode.ensureCode(scriptRecord);
-    // TODO: script entry
-    this.pc = pc;
+    this.registers[0] = scriptRecord;
+    this.pc = this.kScriptEntry;
     return this.evaluate();
   }
 
@@ -141,7 +155,11 @@ class JSEvaluator {
   opReturn() {
     const { Completion } = this.engine262;
 
-    return new Completion({ type: 'Return', Value: this.acc, Target: undefined });
+    return new Completion({ Type: 'return', Value: this.acc, Target: undefined });
+  }
+
+  opUnreachable() {
+    throw new RangeError('unreachable');
   }
 }
 

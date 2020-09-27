@@ -5,5 +5,7 @@
   "main": "src/index.js",
   "author": "engine262 Contributors",
   "license": "MIT",
-  "dependencies": {}
+  "dependencies": {
+    "unicode-13.0.0": "^0.8.0"
+  }
 }
