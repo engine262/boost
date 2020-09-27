@@ -96,6 +96,10 @@ class BytecodeGenerator {
     this.engine262 = engine262;
     this.flags = flags;
     this.code = [];
+
+    if (this.flags.includes('i')) {
+      throw new TypeError('case insensitive not supported');
+    }
   }
 
   visit(node) {
@@ -228,22 +232,19 @@ class BytecodeGenerator {
 
   visitDisjunction(node) {
     const end = this.label();
-    let d = node;
-    while (true) {
-      if (d.Disjunction) {
+
+    for (let d = node; d !== undefined; d = d.Disjunction) {
+      if (d.Disjunction === undefined) {
+        this.visit(d.Alternative);
+      } else {
         const tail = this.label();
         this.fork(tail);
         this.visit(d.Alternative);
         this.jump(end);
         this.bind(tail);
-
-        d = d.Disjunction;
-      } else {
-        this.visit(d.Alternative);
-
-        break;
       }
     }
+
     this.bind(end);
   }
 
@@ -339,7 +340,19 @@ class BytecodeGenerator {
   visitAssertion(node) {
     switch (node.subtype) {
       case '^':
+        if (this.flags.includes('m')) {
+          this.assertion('^n');
+        } else {
+          this.assertion('^');
+        }
+        break;
       case '$':
+        if (this.flags.includes('m')) {
+          this.assertion('$n');
+        } else {
+          this.assertion('$');
+        }
+        break;
       case 'b':
       case 'B':
         this.assertion(node.subtype);

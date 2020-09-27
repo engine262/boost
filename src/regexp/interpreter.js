@@ -10,6 +10,20 @@ const Op = {
   MARK_MATCH_END: 6,
 };
 
+const isLineTerminator = (c) => c === 0x000A || c === 0x000D || c === 0x2028 || c === 0x2029;
+const isRegExpWord = (c) => {
+  if (c >= 0x0061 && c <= 0x007A) {
+    return true;
+  }
+  if (c >= 0x0041 && c <= 0x005A) {
+    return true;
+  }
+  if (c >= 0x0031 && c <= 0x0039) {
+    return true;
+  }
+  return false;
+};
+
 class Thread {
   constructor(pc, matches) {
     this.pc = pc;
@@ -68,21 +82,8 @@ class Interpreter {
           this.bestMatches = thread.matches;
           return;
         case Op.ASSERTION:
-          switch (instr.type) {
-            case '^':
-              if (this.inputIndex !== 0) {
-                return;
-              }
-              break;
-            case '$':
-              if (this.inputIndex !== this.input.length) {
-                return;
-              }
-              break;
-            case 'b':
-            case 'B':
-            default:
-              throw new RangeError(instr.type);
+          if (!this.checkAssertion(instr.type)) {
+            return;
           }
           thread.pc += 1;
           break;
@@ -100,8 +101,45 @@ class Interpreter {
     }
   }
 
+  checkAssertion(type) {
+    switch (type) {
+      case '^':
+        return this.inputIndex === 0;
+      case '$':
+        return this.inputIndex === this.input.length;
+      case '^n':
+        if (this.inputIndex === 0) {
+          return true;
+        }
+        return isLineTerminator(this.input[this.inputIndex - 1]);
+      case '$n':
+        if (this.inputIndex === this.input.length) {
+          return true;
+        }
+        return isLineTerminator(this.input[this.inputIndex]);
+      case 'b':
+        if (this.input.length === 0) {
+          return false;
+        }
+        if (this.inputIndex === 0) {
+          return isRegExpWord(this.input[this.inputIndex]);
+        }
+        if (this.inputIndex === this.input.length) {
+          return isRegExpWord(this.input[this.inputIndex - 1]);
+        }
+        return isRegExpWord(this.input[this.inputIndex - 1])
+          !== isRegExpWord(this.input[this.inputIndex]);
+      case 'B':
+        return !this.checkAssertion('b');
+      default:
+        throw new RangeError(type);
+    }
+  }
+
   flushBlockedThreads(inputChar) {
-    for (const thread of this.blockedThreads) {
+    for (let i = this.blockedThreads.length - 1; i >= 0; i -= 1) {
+      const thread = this.blockedThreads[i];
+
       const instr = this.code[thread.pc];
       if (instr.op !== Op.CONSUME_RANGE) {
         throw new RangeError();

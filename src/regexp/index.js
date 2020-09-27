@@ -33,10 +33,10 @@ class RegExpEvaluator {
         }
         const startIndex = e.bestMatches[i * 2];
         const endIndex = e.bestMatches[(i * 2) + 1];
-        if (startIndex === -1 || endIndex === -1) {
-          return this.engine262.Value.undefined;
+        if (startIndex >= 0 && endIndex >= 0) {
+          return input.slice(startIndex, endIndex);
         }
-        return input.slice(startIndex, endIndex);
+        return this.engine262.Value.undefined;
       });
 
       return new this.engine262.RegExpState(e.bestMatches[1], groups);
