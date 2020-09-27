@@ -71,6 +71,9 @@ function insertRangeInCanonicalList(ranges, count, insert) {
 }
 
 function canonicalize(ranges) {
+  if (ranges.length === 0) {
+    return;
+  }
   let max = ranges[0][1];
   let i = 1;
   while (i < ranges.length) {
@@ -89,6 +92,7 @@ function canonicalize(ranges) {
     numCanonical = insertRangeInCanonicalList(ranges, numCanonical, ranges[i]);
     i += 1;
   } while (i < ranges.length);
+  ranges.length = numCanonical;
 }
 
 class BytecodeGenerator {
@@ -400,20 +404,31 @@ class BytecodeGenerator {
 
   visitAtomEscape(node) {
     switch (true) {
-      case !!node.DecimalEscape:
-      case !!node.CharacterEscape:
+      case !!node.CharacterEscape: {
+        const ranges = this.toRange(node.CharacterEscape);
+        this.consumeRanges(ranges);
+        break;
+      }
       case !!node.CharacterClassEscape: {
         const ranges = this.toRange(node.CharacterClassEscape);
         this.consumeRanges(ranges);
         break;
       }
-      case !!node.GroupName:
       default:
         throw new RangeError(node);
     }
   }
 
   visitCharacterClass(node) {
+    if (node.ClassRanges.length === 0) {
+      if (node.invert) {
+        this.consumeRange(0, 0x10FFFF);
+      } else {
+        this.consumeRange(0x10FFFF, 0);
+      }
+      return;
+    }
+
     const ranges = [];
     node.ClassRanges.forEach((range) => {
       if (Array.isArray(range)) {
@@ -439,6 +454,11 @@ class BytecodeGenerator {
     switch (node.type) {
       case 'ClassAtom':
         return this.toRangeClassAtom(node);
+      case 'ClassEscape':
+      case 'CharacterEscape': {
+        const c = this.engine262.CharacterValue(node);
+        return [[c, c]];
+      }
       case 'CharacterClassEscape':
         return this.toRangeCharacterClassEscape(node);
       default:
@@ -465,20 +485,22 @@ class BytecodeGenerator {
         return complement(this.toRangeCharacterClassEscape({ value: 'd' }));
       case 's':
         return [
-          // WhiteSpace
-          [0x0009, 0x0009],
-          [0x000B, 0x000C],
+          // WhiteSpace + LineTerminator
+          [0x0009, 0x000D],
           [0x0020, 0x0020],
           [0x00A0, 0x00A0],
-          [0xFEFF, 0xFEFF],
-          // LineTerminator
-          [0x000A, 0x000A],
-          [0x000D, 0x000D],
           [0x2028, 0x2029],
+          [0xFEFF, 0xFEFF],
         ];
       case 'S':
         return complement(this.toRangeCharacterClassEscape({ value: 's' }));
       case 'w':
+        return [
+          [0x0030, 0x0039], // 0-9
+          [0x0041, 0x005A], // A-Z
+          [0x005F, 0x005F], // _
+          [0x0061, 0x007A], // a-z
+        ];
       case 'W':
         return complement(this.toRangeCharacterClassEscape({ value: 'w' }));
       case 'p':

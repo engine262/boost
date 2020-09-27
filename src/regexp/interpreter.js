@@ -18,7 +18,7 @@ const isRegExpWord = (c) => {
   if (c >= 0x0041 && c <= 0x005A) {
     return true;
   }
-  if (c >= 0x0031 && c <= 0x0039) {
+  if (c >= 0x0030 && c <= 0x0039) {
     return true;
   }
   return false;
