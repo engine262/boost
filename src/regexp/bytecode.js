@@ -96,6 +96,12 @@ function canonicalize(ranges) {
 }
 
 class BytecodeGenerator {
+  static generate(engine262, ast, flags) {
+    const b = new BytecodeGenerator(engine262, flags);
+    b.visit(ast);
+    return b.code;
+  }
+
   constructor(engine262, flags) {
     this.engine262 = engine262;
     this.flags = flags;
@@ -178,11 +184,6 @@ class BytecodeGenerator {
     const emit = (range) => {
       this.consumeRange(range[0], range[1]);
     };
-
-    if (ranges.length === 1) {
-      emit(ranges[0]);
-      return;
-    }
 
     const end = this.label();
     for (let i = 0; i < ranges.length; i += 1) {

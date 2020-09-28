@@ -9,8 +9,7 @@ class RegExpEvaluator {
   }
 
   evaluatePattern(ast, flags) {
-    const b = new BytecodeGenerator(this.engine262, flags);
-    b.visit(ast);
+    const code = BytecodeGenerator.generate(this.engine262, ast, flags);
     return (S, index) => {
       let input;
       if (flags.includes('u')) {
@@ -19,7 +18,7 @@ class RegExpEvaluator {
         input = S.stringValue().split('').map((c) => c.charCodeAt(0));
       }
 
-      const e = new Interpreter(b.code, input, index.numberValue());
+      const e = new Interpreter(code, input, index.numberValue());
 
       const numMatches = e.findMatches(ast.capturingGroups.length + 1);
 
