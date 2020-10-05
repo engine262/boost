@@ -96,19 +96,23 @@ function canonicalize(ranges) {
 }
 
 class BytecodeGenerator {
-  static generate(engine262, ast, flags) {
-    const b = new BytecodeGenerator(engine262, flags);
-    b.visit(ast);
+  static generate(engine262, pattern, flags) {
+    const b = new BytecodeGenerator(engine262, pattern, flags);
+    b.visit(pattern);
     return b.code;
   }
 
-  constructor(engine262, flags) {
+  constructor(engine262, pattern, flags) {
     this.engine262 = engine262;
+    this.pattern = pattern;
     this.flags = flags;
     this.code = [];
 
     if (this.flags.includes('i')) {
       throw new TypeError('case insensitive not supported');
+    }
+    if (this.engine262.surroundingAgent.feature('regexp-match-indices')) {
+      throw new TypeError('match indices not supported');
     }
   }
 
@@ -228,6 +232,13 @@ class BytecodeGenerator {
     });
   }
 
+  backreference(index) {
+    this.code.push({
+      op: Op.BACKREFERENCE,
+      index,
+    });
+  }
+
   visitPattern(node) {
     this.markMatchStart(0);
     this.visit(node.Disjunction);
@@ -292,6 +303,9 @@ class BytecodeGenerator {
           max = b || a;
           break;
         }
+      }
+      if (min > 16 || (max !== Infinity && max > 16)) {
+        throw new RangeError('Too much replication');
       }
       const repetition = max - min;
       for (let i = 0; i < min; i += 1) {
@@ -405,6 +419,9 @@ class BytecodeGenerator {
 
   visitAtomEscape(node) {
     switch (true) {
+      case !!node.DecimalEscape:
+        this.backreference(node.DecimalEscape.value);
+        break;
       case !!node.CharacterEscape: {
         const ranges = this.toRange(node.CharacterEscape);
         this.consumeRanges(ranges);
@@ -413,6 +430,11 @@ class BytecodeGenerator {
       case !!node.CharacterClassEscape: {
         const ranges = this.toRange(node.CharacterClassEscape);
         this.consumeRanges(ranges);
+        break;
+      }
+      case !!node.GroupName: {
+        const index = this.pattern.groupSpecifiers.get(node.GroupName);
+        this.backreference(index + 1);
         break;
       }
       default:
