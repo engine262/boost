@@ -22,3 +22,13 @@ const agent = new engine262.Agent({
 
 // ...
 ```
+
+### Benchmarks
+
+#### JavaScript
+
+Coming Soon.
+
+#### RegExp
+
+![](https://gc.gy/69646238.png)
